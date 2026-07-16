@@ -1,0 +1,23 @@
+{
+  "name": "upgb-ots-webapp",
+  "version": "1.0.0",
+  "description": "UPGB OTS (One Time Settlement) calculator - hosted PWA",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "express-session": "^1.18.0",
+    "multer": "^2.2.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

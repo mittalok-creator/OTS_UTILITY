@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>UPGB OTS Calculator — Sign in</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#122642">
@@ -12,12 +12,16 @@
 <div class="login-card">
   <div class="login-logo"><img src="/icons/upgb-logo.png" alt="UPGB" width="34" height="34"></div>
   <h1>UPGB OTS Calculator</h1>
-  <p>Enter the shared passphrase to continue.</p>
+  <p>Enter the access code to continue.</p>
   <form id="loginForm" autocomplete="off">
-    <input type="password" id="passphrase" placeholder="Passphrase" autocomplete="current-password" required>
+    <input type="password" id="passphrase" placeholder="Access Code" autocomplete="current-password" required>
     <button type="submit" id="loginBtn">Sign in</button>
   </form>
   <div id="loginError" class="login-error" role="alert" aria-live="polite"></div>
+  <div class="login-signature">
+    <span class="ls-badge"><span>AM</span></span>
+    <span class="ls-name">Alok Mittal</span>
+  </div>
 </div>
 <script>
 const form = document.getElementById('loginForm');

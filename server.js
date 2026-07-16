@@ -98,7 +98,7 @@ app.post('/api/login', loginLimiter, (req, res) => {
       return res.json({ ok: true, role: 'user' });
     }
   }
-  return res.status(401).json({ error: 'Incorrect passphrase' });
+  return res.status(401).json({ error: 'Incorrect code' });
 });
 
 app.post('/api/logout', (req, res) => {

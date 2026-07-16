@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
-const session = require('express-session');
+const cookieSession = require('cookie-session');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 
@@ -44,17 +44,17 @@ const app = express();
 app.set('trust proxy', 1); // needed behind Render/Railway/any reverse proxy for secure cookies to work
 app.use(express.json());
 
-app.use(session({
-  secret: SESSION_SECRET,
+// Auth state lives in a signed cookie (not server memory) so it survives the
+// server restarting — Render's free tier spins the whole process down after
+// ~15 minutes idle and starts a fresh one on the next request, which would
+// otherwise silently log everyone out mid-session.
+app.use(cookieSession({
   name: 'upgb.sid',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 1000 * 60 * 60 * 12, // 12 hours
-  },
+  keys: [SESSION_SECRET],
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: 1000 * 60 * 60 * 12, // 12 hours
 }));
 
 function requireAuth(req, res, next) {
@@ -102,7 +102,8 @@ app.post('/api/login', loginLimiter, (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
+  req.session = null;
+  res.json({ ok: true });
 });
 
 // ---------- Static public assets (no PII in any of these) ----------

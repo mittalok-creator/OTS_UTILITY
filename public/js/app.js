@@ -514,6 +514,19 @@
   window.toggleFreeze = toggleFreeze;
   window.onOtsInput = onOtsInput;
 
+  async function applyRolePermissions() {
+    try {
+      const res = await fetch('/api/state');
+      if (res.status === 401) { window.location.href = '/'; return; }
+      const data = await res.json();
+      if (data.role !== 'admin') {
+        const btn = document.getElementById('updateDataBtn');
+        if (btn) btn.style.display = 'none';
+      }
+    } catch (e) { /* non-fatal: server still enforces the restriction either way */ }
+  }
+
   wireStaticButtons();
   renderEmpty();
+  applyRolePermissions();
 })();

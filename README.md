@@ -23,26 +23,34 @@ things that matter more here than in a typical side project:
   outside the bank's own infrastructure. This code doesn't make that call for
   you — an intranet/on-premise deployment avoids the question entirely if
   that's an option.
-- **The shared passphrase is the only thing standing between the internet and
-  this data.** Make it long and random, not a word. Everyone who has it can
-  see every borrower's full detail. If someone leaves the 10-person group,
-  rotate `APP_PASSPHRASE` immediately (see below).
+- **The passphrases are the only thing standing between the internet and this
+  data.** There are two tiers: `ADMIN_PASSPHRASE` (upload access) and
+  `USER_PASSPHRASE` (search/calculate only, no upload). Everyone who has
+  either one can see every borrower's full detail — the tiers only gate the
+  *upload* feature, not what data is visible. If someone leaves the group,
+  rotate both passphrases immediately (see below).
 
 ## Local setup
 
 ```bash
 npm install
 cp .env.example .env
-# edit .env: set APP_PASSPHRASE and SESSION_SECRET
+# edit .env: set ADMIN_PASSPHRASE, USER_PASSPHRASE, and SESSION_SECRET
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # generates a SESSION_SECRET
 npm start
 ```
 
-Visit `http://localhost:3000`, sign in with your passphrase, then use the
-"Update Data" button (top right) to upload your NPA workbook (.xlsx with an
-`NPA` sheet, optionally an `OLD OTS` sheet) or a daily `e-AB NPA AC WISE` CSV
-export. That becomes the live dataset for everyone signed in, and is saved to
-`data/npa-data.json` on the server so it survives a restart.
+Visit `http://localhost:3000` and sign in with either passphrase:
+- **Admin passphrase** → full access, including the "Update Data" button
+  (top right) to upload your NPA workbook (.xlsx with an `NPA` sheet,
+  optionally an `OLD OTS` sheet) or a daily `e-AB NPA AC WISE` CSV export.
+- **User passphrase** → search/detail/calculate only; the Update Data button
+  doesn't appear, and the upload endpoint rejects the request server-side
+  even if someone tries to call it directly.
+
+Whichever passphrase uploads data, it becomes the live dataset for everyone
+signed in, saved to `data/npa-data.json` on the server so it survives a
+restart.
 
 ## Deploying
 
@@ -61,16 +69,17 @@ staged.
 
 ### 2. Host the Node server somewhere with HTTPS
 
-Since this needs to be reachable from anywhere (not just the bank intranet),
-you need a real host — GitHub Pages won't work here since it's static-only
-and can't run this server or protect the data behind a login. Reasonable
-options for a 10-user internal tool:
+A domain name (e.g. one bought via Squarespace Domains, formerly Google
+Domains) doesn't run anything by itself — it just points visitors somewhere.
+GitHub Pages won't work either, since it's static-only and can't run this
+server or protect data behind a login. You need an actual host to run
+`server.js`:
 
 - **Render.com** or **Railway.app** — connect your GitHub repo, they detect
-  `npm start`, set `APP_PASSPHRASE`/`SESSION_SECRET` as environment variables
-  in their dashboard (never in the repo), and both give you free HTTPS out of
-  the box. Render's free tier sleeps when idle (slow first load); a paid
-  "always on" instance avoids that.
+  `npm start`, set `ADMIN_PASSPHRASE`/`USER_PASSPHRASE`/`SESSION_SECRET` as
+  environment variables in their dashboard (never in the repo), and both
+  give you free HTTPS out of the box. Render's free tier sleeps when idle
+  (slow first load); a paid "always on" instance avoids that.
 - **A small VPS** (if your bank already has one) — more control, but you own
   patching, HTTPS certs (use Certbot/Let's Encrypt), and process supervision
   (`pm2` or a systemd unit).
@@ -78,18 +87,37 @@ options for a 10-user internal tool:
 Either way: set `NODE_ENV=production` so session cookies get the `secure`
 flag (cookies only sent over HTTPS).
 
+#### Pointing your Squarespace domain at the host
+
+Once deployed, the host gives you a default URL (e.g.
+`ots-utility.onrender.com`). To use your own domain instead:
+
+1. In Render/Railway's dashboard, add your custom domain (e.g.
+   `ots.yourdomain.com`) under the service's "Custom Domains" / "Networking"
+   settings — it'll show you a CNAME target to point to.
+2. In Squarespace's [domain DNS settings](https://account.squarespace.com/domains),
+   add a CNAME record: host `ots` (or whatever subdomain you want), pointing
+   to the target Render/Railway gave you.
+3. Wait for DNS to propagate (usually minutes, sometimes a few hours), then
+   the host will auto-issue an HTTPS certificate for your domain.
+
+Using a subdomain (`ots.yourdomain.com`) rather than the bare domain is
+simpler to set up with a CNAME; a bare/apex domain needs an A/ALIAS record
+instead, which the host's custom-domain instructions will show if needed.
+
 ### 3. Upload real data once, on the live server
 
 After deploying, sign in and use "Update Data" to upload the real NPA
 workbook directly on the hosted app — don't put it in the repo or commit it
 anywhere.
 
-## Rotating the passphrase
+## Rotating a passphrase
 
-Change `APP_PASSPHRASE` in your host's environment variables and redeploy/
-restart. Everyone's existing session stays valid until it expires (12 hours)
-or they sign out — for an immediate cutoff, also change `SESSION_SECRET` in
-the same step, which invalidates all existing sessions instantly.
+Change `ADMIN_PASSPHRASE` and/or `USER_PASSPHRASE` in your host's environment
+variables and redeploy/restart. Everyone's existing session stays valid until
+it expires (12 hours) or they sign out — for an immediate cutoff, also change
+`SESSION_SECRET` in the same step, which invalidates all existing sessions
+instantly.
 
 ## Installing as a PWA
 

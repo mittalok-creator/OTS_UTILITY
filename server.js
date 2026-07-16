@@ -10,13 +10,14 @@ const multer = require('multer');
 const { C, toDate, OtsStore } = require('./lib/ots-engine');
 const { parseUploadedFile } = require('./lib/parse-upload');
 
-const APP_PASSPHRASE = process.env.APP_PASSPHRASE;
+const ADMIN_PASSPHRASE = process.env.ADMIN_PASSPHRASE;
+const USER_PASSPHRASE = process.env.USER_PASSPHRASE;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'npa-data.json');
 
-if (!APP_PASSPHRASE || !SESSION_SECRET) {
-  console.error('Missing APP_PASSPHRASE or SESSION_SECRET. Copy .env.example to .env and fill them in.');
+if (!ADMIN_PASSPHRASE || !USER_PASSPHRASE || !SESSION_SECRET) {
+  console.error('Missing ADMIN_PASSPHRASE, USER_PASSPHRASE or SESSION_SECRET. Copy .env.example to .env and fill them in.');
   process.exit(1);
 }
 
@@ -62,6 +63,11 @@ function requireAuth(req, res, next) {
   return res.redirect('/');
 }
 
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.role === 'admin') return next();
+  return res.status(403).json({ error: 'Admin access required' });
+}
+
 function safeEqual(a, b) {
   const bufA = Buffer.from(String(a));
   const bufB = Buffer.from(String(b));
@@ -80,9 +86,17 @@ const loginLimiter = rateLimit({
 // ---------- Auth routes ----------
 app.post('/api/login', loginLimiter, (req, res) => {
   const { passphrase } = req.body || {};
-  if (typeof passphrase === 'string' && safeEqual(passphrase, APP_PASSPHRASE)) {
-    req.session.authenticated = true;
-    return res.json({ ok: true });
+  if (typeof passphrase === 'string') {
+    if (safeEqual(passphrase, ADMIN_PASSPHRASE)) {
+      req.session.authenticated = true;
+      req.session.role = 'admin';
+      return res.json({ ok: true, role: 'admin' });
+    }
+    if (safeEqual(passphrase, USER_PASSPHRASE)) {
+      req.session.authenticated = true;
+      req.session.role = 'user';
+      return res.json({ ok: true, role: 'user' });
+    }
   }
   return res.status(401).json({ error: 'Incorrect passphrase' });
 });
@@ -109,7 +123,7 @@ app.get('/app', requireAuth, (req, res) => {
 
 // ---------- Data API (all require auth) ----------
 app.get('/api/state', requireAuth, (req, res) => {
-  res.json({ loaded: store.rowCount > 0, rowCount: store.rowCount, reportDate: new Date().toISOString() });
+  res.json({ loaded: store.rowCount > 0, rowCount: store.rowCount, reportDate: new Date().toISOString(), role: req.session.role });
 });
 
 function toResultCard(row) {
@@ -150,10 +164,10 @@ app.get('/api/detail', requireAuth, (req, res) => {
   });
 });
 
-// ---------- Data upload (admin-style, still just needs the shared passphrase session) ----------
+// ---------- Data upload (admin only) ----------
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+app.post('/api/upload', requireAuth, requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
     const parsed = parseUploadedFile(req.file.buffer, req.file.originalname);
